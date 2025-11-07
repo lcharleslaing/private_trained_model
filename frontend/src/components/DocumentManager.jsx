@@ -3,6 +3,7 @@ import { uploadDocument, listDocuments, deleteDocument, reindexDocuments } from 
 
 function DocumentManager({ onUpdate }) {
   const [documents, setDocuments] = useState([])
+  const [stats, setStats] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [reindexing, setReindexing] = useState(false)
   const [uploadStatus, setUploadStatus] = useState(null)
@@ -15,6 +16,7 @@ function DocumentManager({ onUpdate }) {
     try {
       const response = await listDocuments()
       setDocuments(response.documents || [])
+      setStats(response.stats || null)
     } catch (error) {
       console.error('Error loading documents:', error)
     }
@@ -41,10 +43,20 @@ function DocumentManager({ onUpdate }) {
 
     try {
       const response = await uploadDocument(file)
-      setUploadStatus({
-        type: 'success',
-        message: `Document "${response.filename}" processed successfully! ${response.chunks} chunks created.`,
-      })
+      if (response.already_exists) {
+        setUploadStatus({
+          type: 'info',
+          message: `Document "${response.filename}" already exists in database (${response.chunks} chunks).`,
+        })
+      } else {
+        const statsMsg = response.database_stats 
+          ? ` Database now has ${response.database_stats.total_documents} documents with ${response.database_stats.total_chunks} total chunks.`
+          : ''
+        setUploadStatus({
+          type: 'success',
+          message: `Document "${response.filename}" added to database! ${response.chunks} chunks created.${statsMsg}`,
+        })
+      }
       await loadDocuments()
       if (onUpdate) onUpdate()
       
@@ -109,7 +121,11 @@ function DocumentManager({ onUpdate }) {
         {uploadStatus && (
           <div
             className={`alert ${
-              uploadStatus.type === 'success' ? 'alert-success' : 'alert-error'
+              uploadStatus.type === 'success' 
+                ? 'alert-success' 
+                : uploadStatus.type === 'info'
+                ? 'alert-info'
+                : 'alert-error'
             }`}
           >
             <span>{uploadStatus.message}</span>
@@ -138,6 +154,23 @@ function DocumentManager({ onUpdate }) {
         </div>
 
         <div className="divider">Manage Documents</div>
+
+        {stats && (
+          <div className="stats stats-vertical lg:stats-horizontal shadow mb-4">
+            <div className="stat">
+              <div className="stat-title">Total Documents</div>
+              <div className="stat-value text-primary">{stats.total_documents}</div>
+            </div>
+            <div className="stat">
+              <div className="stat-title">Total Chunks</div>
+              <div className="stat-value text-secondary">{stats.total_chunks}</div>
+            </div>
+            <div className="stat">
+              <div className="stat-title">Database Size</div>
+              <div className="stat-value text-accent">{stats.total_size_mb} MB</div>
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold">Processed Documents ({documents.length})</h3>
@@ -169,6 +202,8 @@ function DocumentManager({ onUpdate }) {
                 <tr>
                   <th>Filename</th>
                   <th>Chunks</th>
+                  <th>Size</th>
+                  <th>Uploaded</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -177,6 +212,8 @@ function DocumentManager({ onUpdate }) {
                   <tr key={doc.document_id}>
                     <td>{doc.filename}</td>
                     <td>{doc.chunks}</td>
+                    <td>{(doc.file_size / 1024).toFixed(1)} KB</td>
+                    <td>{doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : 'Unknown'}</td>
                     <td>
                       <button
                         className="btn btn-sm btn-error"

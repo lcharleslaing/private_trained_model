@@ -119,8 +119,8 @@ async def chat(message: ChatMessage):
 
 
 @app.post("/documents/upload")
-async def upload_document(file: UploadFile = File(...)):
-    """Upload and process a document"""
+async def upload_document(file: UploadFile = File(...), force_reprocess: bool = False):
+    """Upload and process a document - adds to the expanding document database"""
     try:
         # Save file
         file_path = DOCUMENTS_DIR / file.filename
@@ -128,14 +128,30 @@ async def upload_document(file: UploadFile = File(...)):
             content = await file.read()
             f.write(content)
         
-        # Process and index document
-        result = await document_service.process_document(file_path)
+        # Check if document already exists
+        if document_service.document_exists(file_path) and not force_reprocess:
+            existing_doc = document_service.embeddings_index[document_service._get_document_id(file_path)]
+            return {
+                "message": "Document already exists in database",
+                "filename": file.filename,
+                "chunks": existing_doc["chunks"],
+                "document_id": document_service._get_document_id(file_path),
+                "already_exists": True
+            }
+        
+        # Process and index document (adds to expanding context pool)
+        result = await document_service.process_document(file_path, force_reprocess=force_reprocess)
+        
+        # Get updated stats
+        stats = document_service.get_document_stats()
         
         return {
-            "message": "Document processed successfully",
+            "message": result.get("message", "Document processed and added to database"),
             "filename": file.filename,
             "chunks": result["chunks"],
-            "document_id": result["document_id"]
+            "document_id": result["document_id"],
+            "already_exists": result.get("already_exists", False),
+            "database_stats": stats
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -143,9 +159,13 @@ async def upload_document(file: UploadFile = File(...)):
 
 @app.get("/documents")
 async def list_documents():
-    """List all processed documents"""
+    """List all processed documents in the database"""
     documents = document_service.list_documents()
-    return {"documents": documents}
+    stats = document_service.get_document_stats()
+    return {
+        "documents": documents,
+        "stats": stats
+    }
 
 
 @app.delete("/documents/{document_id}")

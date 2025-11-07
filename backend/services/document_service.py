@@ -2,6 +2,7 @@ from pathlib import Path
 import hashlib
 import json
 from typing import List, Dict, Optional
+import datetime
 import PyPDF2
 import docx
 from sentence_transformers import SentenceTransformer
@@ -43,9 +44,21 @@ class DocumentService:
             json.dump(self.embeddings_index, f, indent=2)
     
     def _get_document_id(self, file_path: Path) -> str:
-        """Generate a unique document ID"""
-        content = f"{file_path.name}_{file_path.stat().st_mtime}"
-        return hashlib.md5(content.encode()).hexdigest()
+        """Generate a unique document ID based on file content"""
+        # Use file content hash for better duplicate detection
+        try:
+            with open(file_path, "rb") as f:
+                file_content = f.read()
+            return hashlib.md5(file_content).hexdigest()
+        except:
+            # Fallback to filename + mtime if can't read
+            content = f"{file_path.name}_{file_path.stat().st_mtime}"
+            return hashlib.md5(content.encode()).hexdigest()
+    
+    def document_exists(self, file_path: Path) -> bool:
+        """Check if a document with the same content already exists"""
+        doc_id = self._get_document_id(file_path)
+        return doc_id in self.embeddings_index
     
     def _extract_text_from_pdf(self, file_path: Path) -> str:
         """Extract text from PDF file"""
@@ -105,16 +118,32 @@ class DocumentService:
         
         return chunks
     
-    async def process_document(self, file_path: Path) -> Dict:
-        """Process a document: extract text, chunk it, and create embeddings"""
+    async def process_document(self, file_path: Path, force_reprocess: bool = False) -> Dict:
+        """Process a document: extract text, chunk it, and create embeddings
+        
+        Args:
+            file_path: Path to the document file
+            force_reprocess: If True, reprocess even if document already exists
+        """
+        # Generate document ID
+        document_id = self._get_document_id(file_path)
+        
+        # Check if document already exists
+        if document_id in self.embeddings_index and not force_reprocess:
+            existing_doc = self.embeddings_index[document_id]
+            return {
+                "document_id": document_id,
+                "chunks": existing_doc["chunks"],
+                "chunks_data": [],
+                "message": "Document already exists in database",
+                "already_exists": True
+            }
+        
         # Extract text
         text = self._extract_text(file_path)
         
         if not text.strip():
             raise Exception("Document appears to be empty")
-        
-        # Generate document ID
-        document_id = self._get_document_id(file_path)
         
         # Chunk the text
         chunks = self._chunk_text(text)
@@ -154,11 +183,14 @@ class DocumentService:
         with open(chunks_file, "w", encoding="utf-8") as f:
             json.dump(chunks_metadata, f, indent=2, ensure_ascii=False)
         
-        # Update index
+        # Update index with metadata
         self.embeddings_index[document_id] = {
             "filename": file_path.name,
             "chunks": len(document_chunks),
-            "chunk_ids": [chunk["chunk_id"] for chunk in document_chunks]
+            "chunk_ids": [chunk["chunk_id"] for chunk in document_chunks],
+            "uploaded_at": datetime.datetime.now().isoformat(),
+            "file_size": file_path.stat().st_size,
+            "file_path": str(file_path)
         }
         
         # Save index
@@ -167,19 +199,39 @@ class DocumentService:
         return {
             "document_id": document_id,
             "chunks": len(document_chunks),
-            "chunks_data": document_chunks
+            "chunks_data": document_chunks,
+            "already_exists": False,
+            "message": "Document processed and added to database"
         }
     
     def list_documents(self) -> List[Dict]:
-        """List all processed documents"""
+        """List all processed documents with metadata"""
         documents = []
         for doc_id, doc_info in self.embeddings_index.items():
-            documents.append({
+            doc_data = {
                 "document_id": doc_id,
                 "filename": doc_info["filename"],
-                "chunks": doc_info["chunks"]
-            })
+                "chunks": doc_info["chunks"],
+                "uploaded_at": doc_info.get("uploaded_at", "Unknown"),
+                "file_size": doc_info.get("file_size", 0)
+            }
+            documents.append(doc_data)
+        # Sort by upload date (newest first)
+        documents.sort(key=lambda x: x.get("uploaded_at", ""), reverse=True)
         return documents
+    
+    def get_document_stats(self) -> Dict:
+        """Get statistics about the document database"""
+        total_docs = len(self.embeddings_index)
+        total_chunks = sum(doc_info.get("chunks", 0) for doc_info in self.embeddings_index.values())
+        total_size = sum(doc_info.get("file_size", 0) for doc_info in self.embeddings_index.values())
+        
+        return {
+            "total_documents": total_docs,
+            "total_chunks": total_chunks,
+            "total_size_bytes": total_size,
+            "total_size_mb": round(total_size / (1024 * 1024), 2)
+        }
     
     def delete_document(self, document_id: str):
         """Delete a document and its embeddings"""

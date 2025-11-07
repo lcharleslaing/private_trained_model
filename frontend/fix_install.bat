@@ -19,8 +19,11 @@ if exist node_modules (
 echo Step 4: Removing package-lock.json...
 if exist package-lock.json del package-lock.json
 
-echo Step 5: Installing dependencies (ignoring scripts to avoid patch-package error)...
-call npm install --ignore-scripts
+echo Step 5: Installing dependencies...
+call npm install
+
+echo Step 6: Installing esbuild platform binary (required for Windows)...
+call npm install @esbuild/win32-x64 --save-dev
 
 echo.
 echo Installation complete! You can now run: npm run dev
