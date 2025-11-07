@@ -27,7 +27,7 @@ function DocumentManager({ onUpdate }) {
     if (!file) return
 
     // Check file type
-    const allowedTypes = ['.pdf', '.docx', '.doc', '.txt']
+    const allowedTypes = ['.pdf', '.docx', '.doc', '.txt', '.xlsx', '.xls', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']
     const fileExtension = '.' + file.name.split('.').pop().toLowerCase()
     
     if (!allowedTypes.includes(fileExtension)) {
@@ -136,15 +136,18 @@ function DocumentManager({ onUpdate }) {
 
         <div className="form-control">
           <label className="label">
-            <span className="label-text">Upload PDF, DOCX, or TXT files</span>
+            <span className="label-text">Upload documents or images (PDF, Word, Excel, TXT, JPG, PNG, etc.)</span>
           </label>
           <input
             type="file"
             className="file-input file-input-bordered w-full"
-            accept=".pdf,.docx,.doc,.txt"
+            accept=".pdf,.docx,.doc,.txt,.xlsx,.xls,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.webp"
             onChange={handleFileUpload}
             disabled={uploading}
           />
+          <label className="label">
+            <span className="label-text-alt">Images: OCR extracts text, Vision model describes content</span>
+          </label>
           {uploading && (
             <div className="mt-2">
               <span className="loading loading-spinner loading-sm"></span>

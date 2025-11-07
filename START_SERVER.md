@@ -101,14 +101,27 @@ Open your browser to: **http://localhost:5173**
 
 All configuration is done through the `.env` file. Key variables:
 
-- `OLLAMA_BASE_URL` - Ollama server URL (default: http://localhost:11434)
-- `OLLAMA_MODEL` - Model to use (default: llama3.2)
-- `BACKEND_PORT` - Backend server port (default: 8000)
-- `FRONTEND_PORT` - Frontend dev server port (default: 5173)
-- `EMBEDDING_MODEL` - Embedding model name (default: all-MiniLM-L6-v2)
-- `RAG_TOP_K` - Number of document chunks to retrieve (default: 3)
+- **Ollama Settings:**
+  - `OLLAMA_BASE_URL` - Ollama server URL (default: http://localhost:11434)
+  - `OLLAMA_MODEL` - Model to use (default: llama3.2)
 
-See `.env.example` for all available options.
+- **Server Settings:**
+  - `BACKEND_PORT` - Backend server port (default: 8000)
+  - `FRONTEND_PORT` - Frontend dev server port (default: 5173)
+
+- **Document Processing:**
+  - `EMBEDDING_MODEL` - Embedding model name (default: all-MiniLM-L6-v2)
+  - `CHUNK_SIZE` - Text chunk size (default: 500)
+  - `CHUNK_OVERLAP` - Overlap between chunks (default: 50)
+  - `ENABLE_OCR` - Enable OCR for images and scanned documents (default: true)
+  - `ENABLE_VISION` - Enable vision model for understanding visual content (default: true)
+  - `OLLAMA_VISION_MODEL` - Vision model name (default: llava)
+
+- **RAG Settings:**
+  - `RAG_TOP_K` - Number of document chunks to retrieve (default: 3)
+  - `SIMILARITY_THRESHOLD` - Similarity threshold 0.0-1.0 (default: 0.3)
+
+See `.env.example` for all available options with detailed comments.
 
 ## Troubleshooting
 
@@ -130,4 +143,24 @@ See `.env.example` for all available options.
 ### Port conflicts
 - Change ports in `.env` file
 - Update `CORS_ORIGINS` if using different frontend port
+
+### OCR not working
+- Ensure Poppler is installed (see SETUP.md)
+- Check `ENABLE_OCR=true` in `.env`
+- Verify `pdf2image` and `easyocr` are installed: `pip list | grep -E "pdf2image|easyocr"`
+- First OCR run downloads models (requires internet once)
+- See [OCR_SETUP.md](OCR_SETUP.md) for detailed troubleshooting
+
+### Vision model not working
+- Check `ENABLE_VISION=true` in `.env`
+- Install vision model: `ollama pull llava` (or your configured model)
+- Verify Ollama is running: `ollama list`
+- Check `OLLAMA_VISION_MODEL` matches installed model name
+- See [VISION_MODEL_SETUP.md](VISION_MODEL_SETUP.md) for detailed troubleshooting
+
+### Image files not processing
+- Ensure `ENABLE_OCR=true` or `ENABLE_VISION=true` (or both) in `.env`
+- Supported formats: JPG, PNG, GIF, BMP, TIFF, WEBP
+- Check console logs for processing errors
+- See [IMAGE_FILES.md](IMAGE_FILES.md) for detailed information
 

@@ -41,11 +41,20 @@ Then open: **http://localhost:5173**
 When you're ready to test with Ollama:
 
 1. **Install Ollama** from https://ollama.ai
-2. **Pull a model:**
+2. **Install Poppler** (for OCR support):
+   - Windows: https://github.com/oschwartz10612/poppler-windows/releases/
+   - macOS: `brew install poppler`
+   - Linux: `sudo apt-get install poppler-utils`
+3. **Pull models:**
    ```bash
    ollama pull llama3.2
+   ollama pull llava  # For vision model (optional but recommended)
    ```
-3. **Start backend:**
+4. **Set up environment:**
+   ```bash
+   cp .env.example .env
+   ```
+5. **Start backend:**
    ```bash
    cd backend
    python -m venv venv
@@ -54,7 +63,9 @@ When you're ready to test with Ollama:
    pip install -r requirements.txt
    python main.py
    ```
-4. **Frontend is already running** - just refresh the browser!
+6. **Frontend is already running** - just refresh the browser!
+
+**Note:** First run will download embedding and OCR models (requires internet once)
 
 ## Testing the UI
 

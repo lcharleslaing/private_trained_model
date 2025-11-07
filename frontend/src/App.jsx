@@ -6,24 +6,27 @@ import { checkHealth } from './services/api'
 function App() {
   const [isHealthy, setIsHealthy] = useState(false)
   const [ollamaAvailable, setOllamaAvailable] = useState(false)
+  const [healthData, setHealthData] = useState(null)
   const [activeTab, setActiveTab] = useState('chat')
-
-  useEffect(() => {
-    checkHealthStatus()
-    const interval = setInterval(checkHealthStatus, 30000) // Check every 30 seconds
-    return () => clearInterval(interval)
-  }, [])
 
   const checkHealthStatus = async () => {
     try {
       const health = await checkHealth()
       setIsHealthy(health.status === 'healthy')
       setOllamaAvailable(health.ollama_available || false)
+      setHealthData(health)
     } catch (error) {
       setIsHealthy(false)
       setOllamaAvailable(false)
+      setHealthData(null)
     }
   }
+
+  useEffect(() => {
+    checkHealthStatus()
+    const interval = setInterval(checkHealthStatus, 30000) // Check every 30 seconds
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -39,6 +42,11 @@ function App() {
             <div className={`badge ${ollamaAvailable ? 'badge-success' : 'badge-warning'}`}>
               Ollama {ollamaAvailable ? 'Connected' : 'Not Connected'}
             </div>
+            {healthData?.vision_model_available && (
+              <div className="badge badge-info">
+                Vision: {healthData.vision_model || 'Available'}
+              </div>
+            )}
           </div>
         </div>
       </div>

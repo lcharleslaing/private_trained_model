@@ -35,13 +35,19 @@ app.add_middleware(
 # Initialize services with environment variables
 ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2")
-ollama_service = OllamaService(base_url=ollama_base_url, model=ollama_model)
+ollama_vision_model = os.getenv("OLLAMA_VISION_MODEL", "llava")
+ollama_service = OllamaService(
+    base_url=ollama_base_url, 
+    model=ollama_model,
+    vision_model=ollama_vision_model
+)
 
 documents_dir = Path(os.getenv("DOCUMENTS_DIR", "documents"))
 embeddings_dir = Path(os.getenv("EMBEDDINGS_DIR", "embeddings"))
 document_service = DocumentService(
     documents_dir=documents_dir,
-    embeddings_dir=embeddings_dir
+    embeddings_dir=embeddings_dir,
+    vision_service=ollama_service  # Pass vision service for image understanding
 )
 rag_service = RAGService(document_service)
 
@@ -68,7 +74,14 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "ollama_available": ollama_service.check_connection()}
+    ollama_available = ollama_service.check_connection()
+    vision_available = ollama_service.check_vision_model_available() if ollama_available else False
+    return {
+        "status": "healthy", 
+        "ollama_available": ollama_available,
+        "vision_model_available": vision_available,
+        "vision_model": ollama_service.vision_model if vision_available else None
+    }
 
 
 @app.post("/chat", response_model=ChatResponse)

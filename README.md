@@ -5,7 +5,9 @@ A private, offline-capable chat interface that uses local LLM (via Ollama) and c
 ## Features
 
 - 🤖 **Local LLM Integration**: Uses Ollama to run GPT-OSS models completely offline
-- 📄 **Document Processing**: Upload and process PDF, DOCX, and TXT files
+- 📄 **Document Processing**: Upload and process PDF, Word (DOCX, DOC), Excel (XLSX, XLS), TXT, and Image files (JPG, PNG, GIF, etc.)
+- 🖼️ **OCR Support**: Automatically extracts text from drawings and scanned documents using EasyOCR
+- 👁️ **Vision Model Support**: Understands visual content in drawings using open-source vision models (LLaVA via Ollama)
 - 🔍 **RAG (Retrieval Augmented Generation)**: Automatically retrieves relevant document chunks to provide context-aware responses
 - 🔒 **100% Private**: All processing happens locally, no data leaves your machine
 - 💬 **Modern Chat Interface**: Beautiful UI built with React, Tailwind CSS, and DaisyUI
@@ -18,6 +20,14 @@ A private, offline-capable chat interface that uses local LLM (via Ollama) and c
 3. **Ollama** installed and running locally
    - Download from: https://ollama.ai
    - After installation, pull a model: `ollama pull llama3.2` (or another model of your choice)
+4. **Poppler** (for OCR support - optional but recommended)
+   - Windows: Download from https://github.com/oschwartz10612/poppler-windows/releases/
+   - macOS: `brew install poppler`
+   - Linux: `sudo apt-get install poppler-utils`
+   - See [OCR_SETUP.md](OCR_SETUP.md) for detailed instructions
+5. **Vision Model** (for understanding drawings - optional but recommended)
+   - Install via Ollama: `ollama pull llava`
+   - See [VISION_MODEL_SETUP.md](VISION_MODEL_SETUP.md) for detailed instructions
 
 ## Installation
 
@@ -59,8 +69,17 @@ cd frontend
 # Install dependencies
 npm install
 
-# Note: DaisyUI needs to be installed separately
+# Install DaisyUI
 npm install -D daisyui@latest
+```
+
+### 4. Configure Environment
+
+```bash
+# Copy example environment file
+cp .env.example .env
+
+# Edit .env if needed (defaults work for most setups)
 ```
 
 ## Running the Application
@@ -91,8 +110,11 @@ See [START_SERVER.md](START_SERVER.md) for complete setup and troubleshooting gu
 
 1. **Upload Documents**: 
    - Go to the "Documents" tab
-   - Upload PDF, DOCX, or TXT files
+   - Upload PDF, Word (DOCX, DOC), Excel (XLSX, XLS), TXT, or Image files (JPG, PNG, GIF, BMP, TIFF, WEBP)
    - Documents will be processed and indexed automatically
+   - Excel files: All sheets and data are extracted
+   - Word files: Text and tables are extracted
+   - Image files: OCR extracts text, Vision model describes visual content
 
 2. **Chat**:
    - Go to the "Chat" tab
@@ -148,6 +170,9 @@ All configuration is done through the `.env` file. Copy `.env.example` to `.env`
   - `EMBEDDING_MODEL` - Embedding model (default: all-MiniLM-L6-v2)
   - `CHUNK_SIZE` - Text chunk size (default: 500)
   - `CHUNK_OVERLAP` - Overlap between chunks (default: 50)
+  - `ENABLE_OCR` - Enable OCR for drawings/scanned documents (default: true)
+  - `ENABLE_VISION` - Enable vision model for understanding drawings (default: true)
+  - `OLLAMA_VISION_MODEL` - Vision model name (default: llava)
 
 - **RAG Settings:**
   - `RAG_TOP_K` - Number of document chunks to retrieve (default: 3)
@@ -206,9 +231,10 @@ SIMILARITY_THRESHOLD=0.4
 
 ### Document Processing Errors
 
-- Ensure documents are in supported formats (PDF, DOCX, DOC, TXT)
+- Ensure documents are in supported formats (PDF, DOCX, DOC, XLSX, XLS, TXT)
 - Check file permissions
 - For PDFs, ensure they're not password-protected or corrupted
+- For Excel files, ensure openpyxl and pandas are installed: `pip install openpyxl pandas`
 
 ### Frontend Connection Issues
 
@@ -233,9 +259,23 @@ This project is provided as-is for private use.
 
 ## Notes
 
-- The first time you run the application, sentence-transformers will download the embedding model (requires internet)
+- The first time you run the application:
+  - Sentence-transformers will download the embedding model (requires internet once)
+  - EasyOCR will download models on first OCR use (requires internet once, ~100MB)
 - Document processing may take time for large files
+- OCR processing is slower than text extraction but automatic for drawings/scanned docs
 - Ollama models require sufficient RAM (8GB+ recommended for most models)
 - For better performance, use GPU-accelerated Ollama if available
+- OCR works offline after initial model download
+
+## Additional Documentation
+
+- [SETUP.md](SETUP.md) - Quick setup guide
+- [START_SERVER.md](START_SERVER.md) - Detailed server startup instructions
+- [OCR_SETUP.md](OCR_SETUP.md) - OCR configuration and troubleshooting
+- [VISION_MODEL_SETUP.md](VISION_MODEL_SETUP.md) - Vision model setup for understanding drawings
+- [IMAGE_FILES.md](IMAGE_FILES.md) - Direct image file support (JPG, PNG, GIF, etc.)
+- [OFFICE_FILES.md](OFFICE_FILES.md) - Microsoft Office file support (Word, Excel)
+- [PREVIEW_UI.md](PREVIEW_UI.md) - Preview UI without full setup
 
 # private_trained_model

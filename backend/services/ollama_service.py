@@ -1,6 +1,8 @@
 import httpx
 import json
-from typing import Optional, Dict
+import base64
+from typing import Optional, Dict, List
+from pathlib import Path
 import os
 from dotenv import load_dotenv
 
@@ -8,9 +10,10 @@ load_dotenv()
 
 
 class OllamaService:
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.2"):
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.2", vision_model: Optional[str] = None):
         self.base_url = base_url
         self.model = model
+        self.vision_model = vision_model or os.getenv("OLLAMA_VISION_MODEL", "llava")
         self.conversations: Dict[str, list] = {}
     
     def check_connection(self) -> bool:
@@ -120,4 +123,85 @@ Do NOT attempt to answer questions without document context."""
                 return []
         except:
             return []
+    
+    def check_vision_model_available(self) -> bool:
+        """Check if vision model is available"""
+        available_models = self.get_available_models()
+        return any(self.vision_model in model for model in available_models)
+    
+    async def describe_image(self, image_path: Path, prompt: Optional[str] = None) -> str:
+        """Use vision model to describe an image
+        
+        Args:
+            image_path: Path to the image file
+            prompt: Optional custom prompt (default: detailed description prompt)
+        
+        Returns:
+            Description of the image as text
+        """
+        if not image_path.exists():
+            return ""
+        
+        # Read and encode image
+        with open(image_path, "rb") as f:
+            image_data = f.read()
+        
+        image_base64 = base64.b64encode(image_data).decode('utf-8')
+        
+        # Default prompt for technical drawings
+        default_prompt = """Describe this image in detail, focusing on:
+- All visible text, labels, dimensions, and annotations
+- The type of drawing or diagram (technical drawing, schematic, blueprint, etc.)
+- Key components, parts, or elements shown
+- Relationships between elements if visible
+- Any measurements, specifications, or technical details
+- The overall purpose or context of what is shown
+
+Provide a comprehensive description that would help someone understand what is in this image."""
+        
+        user_prompt = prompt or default_prompt
+        
+        # Prepare message with image
+        messages = [
+            {
+                "role": "user",
+                "content": user_prompt,
+                "images": [image_base64]
+            }
+        ]
+        
+        payload = {
+            "model": self.vision_model,
+            "messages": messages,
+            "stream": False
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=180.0) as client:  # Longer timeout for vision
+                response = await client.post(
+                    f"{self.base_url}/api/chat",
+                    json=payload
+                )
+                response.raise_for_status()
+                result = response.json()
+                
+                description = result.get("message", {}).get("content", "")
+                return description
+        except httpx.RequestError as e:
+            raise Exception(f"Failed to connect to Ollama vision model: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Error describing image: {str(e)}")
+    
+    async def describe_images_batch(self, image_paths: List[Path], prompt: Optional[str] = None) -> List[str]:
+        """Describe multiple images (processes sequentially to avoid overwhelming the model)"""
+        descriptions = []
+        for i, image_path in enumerate(image_paths):
+            try:
+                print(f"Describing image {i+1}/{len(image_paths)}: {image_path.name}")
+                description = await self.describe_image(image_path, prompt)
+                descriptions.append(description)
+            except Exception as e:
+                print(f"Error describing {image_path.name}: {str(e)}")
+                descriptions.append("")  # Empty description on error
+        return descriptions
 
