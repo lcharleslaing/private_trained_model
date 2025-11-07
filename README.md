@@ -151,6 +151,7 @@ All configuration is done through the `.env` file. Copy `.env.example` to `.env`
 
 - **RAG Settings:**
   - `RAG_TOP_K` - Number of document chunks to retrieve (default: 3)
+  - `SIMILARITY_THRESHOLD` - Minimum similarity score (0.0-1.0) to consider a document relevant (default: 0.3, lower = more strict)
 
 ### Example: Changing the Model
 
@@ -169,6 +170,31 @@ EMBEDDING_MODEL=all-mpnet-base-v2
 Other good embedding model options:
 - `all-mpnet-base-v2` (better quality, slower)
 - `paraphrase-MiniLM-L6-v2` (similar to default)
+
+### Strict Mode: Document-Only Answers
+
+The system is configured to **ONLY answer questions based on your uploaded documents**. It will refuse to answer questions that aren't covered in your documents.
+
+**How it works:**
+- If no documents are uploaded: System refuses to answer
+- If question isn't in documents: System refuses to answer
+- If documents are relevant: System answers using only the document content
+
+**Adjusting Strictness:**
+
+The `SIMILARITY_THRESHOLD` controls how strict the system is:
+- **Lower values (0.2-0.3)**: More strict - only very relevant documents are used
+- **Higher values (0.4-0.6)**: More lenient - allows less relevant documents
+
+Example: To make it more strict, edit `.env`:
+```env
+SIMILARITY_THRESHOLD=0.25
+```
+
+To make it more lenient:
+```env
+SIMILARITY_THRESHOLD=0.4
+```
 
 ## Troubleshooting
 

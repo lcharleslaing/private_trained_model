@@ -31,9 +31,28 @@ class OllamaService:
         """Send a chat message to Ollama with optional context"""
         
         # Build system prompt with context if provided
-        system_prompt = "You are a helpful AI assistant."
-        if context:
-            system_prompt += f"\n\nUse the following context to answer questions:\n\n{context}\n\nIf the context doesn't contain relevant information, say so."
+        if context and context.strip():
+            # Strict mode: Only answer from provided context
+            system_prompt = """You are a helpful AI assistant that ONLY answers questions based on the provided context documents. 
+
+CRITICAL RULES:
+1. You MUST ONLY use information from the provided context to answer questions.
+2. If the question cannot be answered using the provided context, you MUST respond with: "I can only answer questions based on the documents provided. The information needed to answer this question is not available in the provided documents."
+3. Do NOT use any knowledge outside of the provided context.
+4. Do NOT make up information or infer beyond what is explicitly stated in the context.
+5. If the context is empty or doesn't contain relevant information, clearly state that you cannot answer the question.
+
+Provided context:
+{context}
+
+Remember: Only answer if the information is in the context above. Otherwise, politely decline.""".format(context=context)
+        else:
+            # No context available - refuse to answer
+            system_prompt = """You are a helpful AI assistant, but you can ONLY answer questions based on documents that have been provided. 
+
+Since no relevant documents are available, you must respond with: "I can only answer questions based on the documents provided. No relevant documents are available to answer this question. Please upload relevant documents first."
+
+Do NOT attempt to answer questions without document context."""
         
         # Get or create conversation history
         if conversation_id and conversation_id in self.conversations:

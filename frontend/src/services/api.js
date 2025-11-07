@@ -10,16 +10,28 @@ const api = axios.create({
 })
 
 export const checkHealth = async () => {
-  const response = await api.get('/health')
-  return response.data
+  try {
+    const response = await api.get('/health')
+    return response.data
+  } catch (error) {
+    // Return offline status if backend is not available
+    return {
+      status: 'offline',
+      ollama_available: false
+    }
+  }
 }
 
 export const sendChatMessage = async (message, conversationId = null) => {
-  const response = await api.post('/chat', {
-    message,
-    conversation_id: conversationId,
-  })
-  return response.data
+  try {
+    const response = await api.post('/chat', {
+      message,
+      conversation_id: conversationId,
+    })
+    return response.data
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Backend server is not available. Please start the backend server.')
+  }
 }
 
 export const uploadDocument = async (file) => {
@@ -34,8 +46,13 @@ export const uploadDocument = async (file) => {
 }
 
 export const listDocuments = async () => {
-  const response = await api.get('/documents')
-  return response.data
+  try {
+    const response = await api.get('/documents')
+    return response.data
+  } catch (error) {
+    // Return empty list if backend is not available
+    return { documents: [] }
+  }
 }
 
 export const deleteDocument = async (documentId) => {

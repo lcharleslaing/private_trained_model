@@ -73,13 +73,31 @@ async def health():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(message: ChatMessage):
-    """Send a chat message and get a response with RAG"""
+    """Send a chat message and get a response with RAG - only answers from documents"""
     try:
+        # Check if we have any documents at all
+        all_docs = document_service.list_documents()
+        if not all_docs:
+            return ChatResponse(
+                response="I can only answer questions based on the documents provided. No documents have been uploaded yet. Please upload documents first in the Documents tab.",
+                conversation_id=message.conversation_id or "conv_0",
+                sources=[]
+            )
+        
         # Get relevant documents using RAG
         relevant_docs = rag_service.get_relevant_documents(message.message, top_k=RAG_TOP_K)
         
+        # Check if we have relevant context
+        if not relevant_docs:
+            # No relevant documents found - refuse to answer
+            return ChatResponse(
+                response="I can only answer questions based on the documents provided. The information needed to answer this question is not available in the provided documents. Please ask questions related to the uploaded documents.",
+                conversation_id=message.conversation_id or "conv_0",
+                sources=[]
+            )
+        
         # Build context from documents
-        context = "\n\n".join([doc["content"] for doc in relevant_docs])
+        context = "\n\n".join([f"[From {doc['source']}]:\n{doc['content']}" for doc in relevant_docs])
         
         # Generate response using Ollama with context
         response = await ollama_service.chat(
