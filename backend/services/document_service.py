@@ -66,15 +66,27 @@ class DocumentService:
         return doc_id in self.embeddings_index
     
     def _extract_text_from_pdf(self, file_path: Path) -> str:
-        """Extract text from PDF file"""
+        """Extract text from PDF file
+        
+        Note: This only extracts text content. For image-based PDFs (scanned documents, 
+        drawings), very little or no text will be extracted. Visual elements are not captured.
+        """
         text = ""
         try:
             with open(file_path, "rb") as f:
                 pdf_reader = PyPDF2.PdfReader(f)
                 for page in pdf_reader.pages:
-                    text += page.extract_text() + "\n"
+                    page_text = page.extract_text()
+                    text += page_text + "\n"
         except Exception as e:
             raise Exception(f"Error reading PDF: {str(e)}")
+        
+        # Warn if very little text was extracted (likely image-based PDF)
+        if len(text.strip()) < 50:
+            print(f"Warning: PDF '{file_path.name}' extracted very little text ({len(text.strip())} chars). "
+                  f"This may be an image-based PDF (scanned document or drawing). "
+                  f"Only text labels/annotations will be searchable, not visual content.")
+        
         return text
     
     def _extract_text_from_docx(self, file_path: Path) -> str:
