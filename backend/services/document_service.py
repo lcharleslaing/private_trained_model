@@ -3,6 +3,7 @@ import hashlib
 import json
 from typing import List, Dict, Optional
 import datetime
+import time
 import PyPDF2
 import docx
 from sentence_transformers import SentenceTransformer
@@ -29,6 +30,10 @@ class DocumentService:
         # Load existing embeddings
         self.embeddings_index: Dict[str, List[Dict]] = {}
         self._load_embeddings()
+        
+        # PERFORMANCE: Cache for loaded chunks (avoids reloading from disk every query)
+        self._chunks_cache: Optional[List[Dict]] = None
+        self._cache_timestamp: Optional[float] = 0
     
     def _load_embeddings(self):
         """Load existing embeddings from disk"""
@@ -196,6 +201,9 @@ class DocumentService:
         # Save index
         self._save_embeddings()
         
+        # Invalidate cache since we added new chunks
+        self.invalidate_cache()
+        
         return {
             "document_id": document_id,
             "chunks": len(document_chunks),
@@ -253,9 +261,12 @@ class DocumentService:
         # Remove from index
         del self.embeddings_index[document_id]
         self._save_embeddings()
+        
+        # Invalidate cache since we deleted chunks
+        self.invalidate_cache()
     
     def get_all_chunks(self) -> List[Dict]:
-        """Get all document chunks with their embeddings"""
+        """Get all document chunks with their embeddings (loads from disk)"""
         all_chunks = []
         for doc_id, doc_info in self.embeddings_index.items():
             # Load chunks metadata for this document
@@ -279,9 +290,29 @@ class DocumentService:
                         "document_id": doc_id,
                         "source": doc_info["filename"],
                         "content": chunk_meta.get("content", ""),
-                        "embedding": embedding
+                        "embedding": np.array(embedding)  # Convert to numpy array for faster operations
                     })
         return all_chunks
+    
+    def get_all_chunks_cached(self) -> List[Dict]:
+        """Get all chunks with caching for performance"""
+        current_time = time.time()
+        cache_ttl = 300  # Cache for 5 minutes
+        
+        # Check if cache is valid
+        if (self._chunks_cache is not None and 
+            (current_time - self._cache_timestamp) < cache_ttl):
+            return self._chunks_cache
+        
+        # Load and cache
+        self._chunks_cache = self.get_all_chunks()
+        self._cache_timestamp = current_time
+        return self._chunks_cache
+    
+    def invalidate_cache(self):
+        """Invalidate the chunks cache (call after adding/deleting documents)"""
+        self._chunks_cache = None
+        self._cache_timestamp = 0
     
     async def reindex_all(self) -> Dict:
         """Reindex all documents in the documents directory"""
